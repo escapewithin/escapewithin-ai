@@ -6,96 +6,96 @@ import formatAnswers from '../lib/formatAnswers';
 
 export default function AIChat() {
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [customInput, setCustomInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [answers, setAnswers] = useState<{ [key: string]: string }>({});
+  const [personalInputs, setPersonalInputs] = useState<{ [key: string]: string }>({});
   const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const currentQuestion: Question | undefined = questions[step];
+  const currentQuestion = questions[step];
 
   const handleAnswer = async (answer: string) => {
-    const updatedAnswers = { ...answers, [currentQuestion!.id]: answer };
+    const updatedAnswers = {
+      ...answers,
+      [currentQuestion.id]: answer,
+    };
     setAnswers(updatedAnswers);
-    setCustomInput('');
 
     if (step + 1 < questions.length) {
       setStep(step + 1);
     } else {
-      // All questions answered, submit to API
-      setIsLoading(true);
+      setLoading(true);
       const response = await fetch('/api/generate', {
         method: 'POST',
-        body: JSON.stringify({ answers: updatedAnswers }),
+        body: JSON.stringify({
+          answers: formatAnswers({ ...updatedAnswers, ...personalInputs }),
+        }),
       });
       const data = await response.json();
       setResult(data.result);
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  const handlePersonalInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPersonalInputs({
+      ...personalInputs,
+      [currentQuestion.id]: e.target.value,
+    });
+  };
+
+  const handlePersonalSubmit = () => {
+    const input = personalInputs[currentQuestion.id];
+    if (input && input.trim()) {
+      handleAnswer(input);
+    }
+  };
+
+  if (result) {
+    return (
+      <div className="p-6 max-w-xl mx-auto text-white">
+        <h2 className="text-2xl font-bold mb-4">Your Recommendation:</h2>
+        <p>{result}</p>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ padding: '2rem', color: '#000', background: '#fff', fontFamily: 'sans-serif' }}>
-      {!result && currentQuestion && (
-        <>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>{currentQuestion.text}</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-            {currentQuestion.options.map((option) => (
-              <button
-                key={option}
-                onClick={() => handleAnswer(option)}
-                style={{
-                  backgroundColor: '#0070f3',
-                  color: '#fff',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.25rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-          {currentQuestion.allowCustom && (
-            <div>
-              <input
-                type="text"
-                value={customInput}
-                onChange={(e) => setCustomInput(e.target.value)}
-                placeholder="Or type your answer..."
-                style={{
-                  padding: '0.5rem',
-                  border: '1px solid #ccc',
-                  borderRadius: '0.25rem',
-                  marginRight: '0.5rem',
-                  width: '300px',
-                }}
-              />
-              <button
-                onClick={() => handleAnswer(customInput)}
-                disabled={!customInput.trim()}
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  borderRadius: '0.25rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Submit
-              </button>
-            </div>
-          )}
-        </>
-      )}
-      {isLoading && <p>Loading your recommendation...</p>}
-      {result && (
-        <div>
-          <h2>Your Recommendation:</h2>
-          <p>{result}</p>
+    <div className="p-6 max-w-xl mx-auto text-white">
+      <h2 className="text-xl font-semibold mb-4">{currentQuestion.text}</h2>
+
+      {currentQuestion.options && (
+        <div className="flex flex-col gap-2">
+          {currentQuestion.options.map((option) => (
+            <button
+              key={option}
+              className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
+              onClick={() => handleAnswer(option)}
+            >
+              {option}
+            </button>
+          ))}
         </div>
       )}
+
+      {currentQuestion.allowPersonal && (
+        <div className="mt-4">
+          <textarea
+            className="w-full p-2 rounded bg-white text-black"
+            rows={4}
+            placeholder="Write your answer here..."
+            value={personalInputs[currentQuestion.id] || ''}
+            onChange={handlePersonalInputChange}
+          />
+          <button
+            className="mt-2 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
+            onClick={handlePersonalSubmit}
+          >
+            Submit
+          </button>
+        </div>
+      )}
+
+      {loading && <p className="mt-4">Thinking of your perfect destination...</p>}
     </div>
   );
 }
