@@ -1,52 +1,43 @@
 'use client';
 
 import { useState } from 'react';
-import { questions, Question } from '../lib/questions';
+import { questions } from '../lib/questions';
 import formatAnswers from '../lib/formatAnswers';
 
 export default function AIChat() {
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<{ [key: string]: string }>({});
-  const [personalInputs, setPersonalInputs] = useState<{ [key: string]: string }>({});
+  const [inputs, setInputs] = useState<{ [key: string]: string }>({});
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
 
   const currentQuestion = questions[step];
 
-  const handleAnswer = async (answer: string) => {
-    const updatedAnswers = {
-      ...answers,
-      [currentQuestion.id]: answer,
-    };
-    setAnswers(updatedAnswers);
+  const handleOptionClick = (option: string) => {
+    const prev = inputs[currentQuestion.id] || '';
+    const updated = prev.includes(option)
+      ? prev
+      : prev
+      ? `${prev}, ${option}`
+      : option;
+    setInputs({ ...inputs, [currentQuestion.id]: updated });
+  };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputs({ ...inputs, [currentQuestion.id]: e.target.value });
+  };
+
+  const handleNext = async () => {
     if (step + 1 < questions.length) {
       setStep(step + 1);
     } else {
       setLoading(true);
       const response = await fetch('/api/generate', {
         method: 'POST',
-        body: JSON.stringify({
-          answers: formatAnswers({ ...updatedAnswers, ...personalInputs }),
-        }),
+        body: JSON.stringify({ answers: inputs }),
       });
       const data = await response.json();
       setResult(data.result);
       setLoading(false);
-    }
-  };
-
-  const handlePersonalInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPersonalInputs({
-      ...personalInputs,
-      [currentQuestion.id]: e.target.value,
-    });
-  };
-
-  const handlePersonalSubmit = () => {
-    const input = personalInputs[currentQuestion.id];
-    if (input && input.trim()) {
-      handleAnswer(input);
     }
   };
 
@@ -64,12 +55,12 @@ export default function AIChat() {
       <h2 className="text-xl font-semibold mb-4">{currentQuestion.text}</h2>
 
       {currentQuestion.options && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2 mb-4">
           {currentQuestion.options.map((option) => (
             <button
               key={option}
-              className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
-              onClick={() => handleAnswer(option)}
+              className="bg-blue-600 text-white py-1 px-3 rounded hover:bg-blue-700 transition text-sm"
+              onClick={() => handleOptionClick(option)}
             >
               {option}
             </button>
@@ -77,23 +68,20 @@ export default function AIChat() {
         </div>
       )}
 
-      {currentQuestion.allowPersonal && (
-        <div className="mt-4">
-          <textarea
-            className="w-full p-2 rounded bg-white text-black"
-            rows={4}
-            placeholder="Write your answer here..."
-            value={personalInputs[currentQuestion.id] || ''}
-            onChange={handlePersonalInputChange}
-          />
-          <button
-            className="mt-2 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
-            onClick={handlePersonalSubmit}
-          >
-            Submit
-          </button>
-        </div>
-      )}
+      <textarea
+        className="w-full p-2 rounded bg-white text-black"
+        rows={4}
+        placeholder="Describe your answer..."
+        value={inputs[currentQuestion.id] || ''}
+        onChange={handleChange}
+      />
+
+      <button
+        className="mt-4 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
+        onClick={handleNext}
+      >
+        {step + 1 < questions.length ? 'Next' : 'Submit'}
+      </button>
 
       {loading && <p className="mt-4">Thinking of your perfect destination...</p>}
     </div>
